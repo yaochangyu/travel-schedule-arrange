@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); cmd=$(printf '%s' \"$input\" | jq -r '.tool_input.command // empty'); if printf '%s' \"$cmd\" | grep -Eiq 'user-secrets[[:space:]]+(list|get)'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Blocked: dotnet user-secrets list/get prints secret values in plaintext to stdout. Verify a secret was set via the confirmation message from user-secrets set instead of listing it.\"}}'; fi",
+            "statusMessage": "Checking for unsafe user-secrets list/get..."
+          }
+        ]
+      }
+    ]
+  }
+}
