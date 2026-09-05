@@ -77,4 +77,56 @@ export async function planItinerary(start, attractions) {
   return handleResponse(response)
 }
 
+/**
+ * 查詢多個錨點（多日行程的起點/每晚住宿/訖點）附近的景點/美食，後端合併去重後回傳單一候選池。
+ * @param {Array<{latitude:number, longitude:number}>} anchors
+ * @param {number} [radius] 公尺，預設沿用後端預設值（3000）
+ */
+export async function fetchNearbyAttractionsMultiAnchor(anchors, radius) {
+  const anchorsParam = anchors.map((a) => `${a.latitude},${a.longitude}`).join(';')
+  const params = new URLSearchParams({ anchors: anchorsParam })
+  if (radius) {
+    params.set('radius', radius)
+  }
+  const url = `${API_BASE_URL}/api/attractions/nearby-multianchor?${params.toString()}`
+  const response = await fetch(url)
+  return handleResponse(response)
+}
+
+/**
+ * 多日行程排程：依起訖點、每晚住宿、每日可用時數，將已選景點（含使用者設定的停留時間）分天排序。
+ * @param {object} params
+ * @param {{latitude:number, longitude:number}} params.start
+ * @param {{latitude:number, longitude:number}} params.end
+ * @param {Array<{latitude:number, longitude:number}>} params.overnightStays
+ * @param {number[]} params.dailyAvailableMinutes
+ * @param {Array} params.candidates 需含 name/latitude/longitude/stayDurationMinutes，可選 sourceId/category/address
+ */
+export async function planMultiDayItinerary({ start, end, overnightStays, dailyAvailableMinutes, candidates }) {
+  const body = {
+    startLatitude: start.latitude,
+    startLongitude: start.longitude,
+    endLatitude: end.latitude,
+    endLongitude: end.longitude,
+    overnightStays: overnightStays.map((s) => ({ latitude: s.latitude, longitude: s.longitude })),
+    dailyAvailableMinutes,
+    candidates: candidates.map((c) => ({
+      sourceId: c.sourceId ?? null,
+      name: c.name,
+      category: c.category ?? null,
+      address: c.address ?? null,
+      latitude: c.latitude,
+      longitude: c.longitude,
+      stayDurationMinutes: c.stayDurationMinutes,
+    })),
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/itinerary/plan-multiday`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return handleResponse(response)
+}
+
 export { ApiError }

@@ -78,6 +78,8 @@ async function handleSubmit() {
     <p class="note">
       資料來源：TDX 觀光資訊資料庫（景點/美食）、Google Maps（地理編碼/交通距離）。
     </p>
+
+    <RouterLink class="multiday-link" :to="{ name: 'multiday-input' }">規劃多日行程 →</RouterLink>
   </section>
 </template>
 
@@ -131,5 +133,11 @@ button:disabled {
   margin-top: 2rem;
   font-size: 0.85rem;
   color: #999;
+}
+.multiday-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #42b883;
+  font-weight: 600;
 }
 </style>

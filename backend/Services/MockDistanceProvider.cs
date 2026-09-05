@@ -8,10 +8,20 @@ public class MockDistanceProvider : IDistanceProvider
 {
     private const double EarthRadiusKm = 6371.0;
 
+    /// <summary>模擬平均車速（公里/小時），用於由距離換算預估交通時間。</summary>
+    private const double AverageSpeedKmh = 30.0;
+
     public Task<double> GetDistanceAsync(Coordinate a, Coordinate b)
     {
         var distance = CalculateHaversineDistance(a, b);
         return Task.FromResult(distance);
+    }
+
+    public Task<TravelInfo> GetTravelInfoAsync(Coordinate a, Coordinate b)
+    {
+        var distance = CalculateHaversineDistance(a, b);
+        var durationMinutes = distance / AverageSpeedKmh * 60.0;
+        return Task.FromResult(new TravelInfo(distance, durationMinutes));
     }
 
     private static double CalculateHaversineDistance(Coordinate a, Coordinate b)

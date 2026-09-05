@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TravelScheduleArrange.Api.Data;
 using TravelScheduleArrange.Api.Services;
 using TravelScheduleArrange.Api.Services.GoogleMaps;
+using TravelScheduleArrange.Api.Services.MultiDay;
 using TravelScheduleArrange.Api.Services.Tdx;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,6 +34,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // 步驟 4：行程排序服務。
 builder.Services.AddScoped<IItineraryPlannerService, ItineraryPlannerService>();
+
+// 多日行程規劃功能：候選景點多錨點蒐集服務、多日排程演算法服務。
+builder.Services.AddScoped<IMultiAnchorAttractionService, MultiAnchorAttractionService>();
+builder.Services.AddScoped<IMultiDayItineraryPlannerService, MultiDayItineraryPlannerService>();
 
 // 步驟 3：Google Maps Distance Matrix 介接。ApiKey 透過 dotnet user-secrets 設定於 "Google:ApiKey"，
 // 不寫入 appsettings.json。GoogleDistanceProvider 內部包一個 MockDistanceProvider 當 fallback，

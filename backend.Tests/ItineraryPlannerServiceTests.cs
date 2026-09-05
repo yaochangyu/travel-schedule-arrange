@@ -99,4 +99,30 @@ public class MockDistanceProviderTests
 
         Assert.Equal(distanceAtoB, distanceBtoA, precision: 9);
     }
+
+    [Fact]
+    public async Task GetTravelInfoAsync_相同座標距離與時間應為零()
+    {
+        var provider = new MockDistanceProvider();
+        var point = new Coordinate(25.0478, 121.5170);
+
+        var info = await provider.GetTravelInfoAsync(point, point);
+
+        Assert.Equal(0, info.DistanceKm, precision: 6);
+        Assert.Equal(0, info.DurationMinutes, precision: 6);
+    }
+
+    [Fact]
+    public async Task GetTravelInfoAsync_時間應與GetDistanceAsync距離一致換算()
+    {
+        var provider = new MockDistanceProvider();
+        var a = new Coordinate(25.0478, 121.5170);
+        var b = new Coordinate(25.0330, 121.5654);
+
+        var distance = await provider.GetDistanceAsync(a, b);
+        var info = await provider.GetTravelInfoAsync(a, b);
+
+        Assert.Equal(distance, info.DistanceKm, precision: 9);
+        Assert.True(info.DurationMinutes > 0);
+    }
 }

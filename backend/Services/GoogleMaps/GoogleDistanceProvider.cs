@@ -134,6 +134,107 @@ public class GoogleDistanceProvider : IDistanceProvider
         return element.Distance.Value;
     }
 
+    /// <summary>
+    /// 取得座標 a 到座標 b 的距離（公里）與預估交通時間（分鐘）。邏輯與 <see cref="GetDistanceAsync"/> 相同
+    /// （呼叫同一個 Distance Matrix API、相同的 fallback 規則），差異僅在於一併解析回應中的 <c>duration</c> 欄位。
+    /// </summary>
+    public async Task<TravelInfo> GetTravelInfoAsync(Coordinate a, Coordinate b)
+    {
+        try
+        {
+            var origin = FormatCoordinate(a);
+            var destination = FormatCoordinate(b);
+            var url = $"{_options.BaseUrl}?origins={origin}&destinations={destination}" +
+                      $"&mode=driving&key={_options.ApiKey}";
+
+            var httpClient = _httpClientFactory.CreateClient(HttpClientName);
+            using var response = await httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Google Distance Matrix API HTTP 呼叫失敗：{StatusCode}，改用 MockDistanceProvider fallback 計算近似交通資訊。",
+                    response.StatusCode);
+                return await _fallbackProvider.GetTravelInfoAsync(a, b);
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var travelInfo = ParseTravelInfo(body, out var failureReason);
+
+            if (travelInfo is null)
+            {
+                _logger.LogWarning(
+                    "Google Distance Matrix API 回傳非可用結果（{Reason}），改用 MockDistanceProvider fallback 計算近似交通資訊。",
+                    failureReason);
+                return await _fallbackProvider.GetTravelInfoAsync(a, b);
+            }
+
+            return travelInfo.Value;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "呼叫 Google Distance Matrix API 發生例外，改用 MockDistanceProvider fallback 計算近似交通資訊。");
+            return await _fallbackProvider.GetTravelInfoAsync(a, b);
+        }
+    }
+
+    /// <summary>
+    /// 解析 Google Distance Matrix API 的 JSON 回應，取出距離（公里）與交通時間（分鐘）。
+    /// 判斷邏輯與 <see cref="ParseDistanceMeters"/> 相同，獨立為另一個方法而非改動既有方法的回傳型別，
+    /// 避免影響既有呼叫端與測試。
+    /// </summary>
+    public static TravelInfo? ParseTravelInfo(string json, out string failureReason)
+    {
+        GoogleDistanceMatrixResponse? result;
+        try
+        {
+            result = JsonSerializer.Deserialize<GoogleDistanceMatrixResponse>(json, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            failureReason = "回應 JSON 格式無法解析";
+            return null;
+        }
+
+        if (result is null)
+        {
+            failureReason = "回應內容為空";
+            return null;
+        }
+
+        if (!string.Equals(result.Status, "OK", StringComparison.Ordinal))
+        {
+            failureReason = string.IsNullOrEmpty(result.ErrorMessage)
+                ? $"top-level status={result.Status}"
+                : $"top-level status={result.Status}, error_message={result.ErrorMessage}";
+            return null;
+        }
+
+        var element = result.Rows?.FirstOrDefault()?.Elements?.FirstOrDefault();
+        if (element is null)
+        {
+            failureReason = "回應中缺少 rows/elements";
+            return null;
+        }
+
+        if (!string.Equals(element.Status, "OK", StringComparison.Ordinal))
+        {
+            failureReason = $"element status={element.Status}";
+            return null;
+        }
+
+        if (element.Distance is null || element.Duration is null)
+        {
+            failureReason = "element 缺少 distance 或 duration 欄位";
+            return null;
+        }
+
+        failureReason = string.Empty;
+        return new TravelInfo(element.Distance.Value / 1000.0, element.Duration.Value / 60.0);
+    }
+
     private static string FormatCoordinate(Coordinate coordinate) =>
         $"{coordinate.Latitude.ToString(CultureInfo.InvariantCulture)},{coordinate.Longitude.ToString(CultureInfo.InvariantCulture)}";
 }

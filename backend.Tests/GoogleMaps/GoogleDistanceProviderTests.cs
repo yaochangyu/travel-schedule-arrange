@@ -159,6 +159,76 @@ public class GoogleDistanceProviderTests
         Assert.Equal(expected, distance, precision: 10);
     }
 
+    [Fact]
+    public void ParseTravelInfo_成功回應應正確解析出距離公里數與時間分鐘數()
+    {
+        var info = GoogleDistanceProvider.ParseTravelInfo(SuccessJson, out var failureReason);
+
+        Assert.NotNull(info);
+        Assert.Equal(5.2, info!.Value.DistanceKm, precision: 9);
+        Assert.Equal(15.0, info.Value.DurationMinutes, precision: 9);
+        Assert.Equal(string.Empty, failureReason);
+    }
+
+    [Fact]
+    public void ParseTravelInfo_缺少Duration欄位應回傳null()
+    {
+        const string missingDurationJson = """
+        {
+          "status": "OK",
+          "rows": [
+            {
+              "elements": [
+                { "status": "OK", "distance": { "text": "5.2 km", "value": 5200 } }
+              ]
+            }
+          ]
+        }
+        """;
+
+        var info = GoogleDistanceProvider.ParseTravelInfo(missingDurationJson, out var failureReason);
+
+        Assert.Null(info);
+        Assert.Contains("duration", failureReason);
+    }
+
+    [Fact]
+    public void ParseTravelInfo_RequestDenied應回傳null()
+    {
+        var info = GoogleDistanceProvider.ParseTravelInfo(RequestDeniedJson, out var failureReason);
+
+        Assert.Null(info);
+        Assert.Contains("REQUEST_DENIED", failureReason);
+    }
+
+    [Fact]
+    public async Task GetTravelInfoAsync_API成功時應回傳距離與時間()
+    {
+        var provider = CreateProvider(HttpStatusCode.OK, SuccessJson);
+
+        var info = await provider.GetTravelInfoAsync(
+            new Coordinate(25.0478, 121.5170),
+            new Coordinate(25.0330, 121.5654));
+
+        Assert.Equal(5.2, info.DistanceKm, precision: 5);
+        Assert.Equal(15.0, info.DurationMinutes, precision: 5);
+    }
+
+    [Fact]
+    public async Task GetTravelInfoAsync_API失敗時應Fallback到Mock交通資訊()
+    {
+        var provider = CreateProvider(HttpStatusCode.InternalServerError, "{}");
+        var mock = new MockDistanceProvider();
+        var a = new Coordinate(25.0478, 121.5170);
+        var b = new Coordinate(25.0330, 121.5654);
+
+        var info = await provider.GetTravelInfoAsync(a, b);
+        var expected = await mock.GetTravelInfoAsync(a, b);
+
+        Assert.Equal(expected.DistanceKm, info.DistanceKm, precision: 10);
+        Assert.Equal(expected.DurationMinutes, info.DurationMinutes, precision: 10);
+    }
+
     private static GoogleDistanceProvider CreateProvider(HttpStatusCode statusCode, string responseBody) =>
         CreateProvider(new StubHttpMessageHandler(statusCode, responseBody));
 
