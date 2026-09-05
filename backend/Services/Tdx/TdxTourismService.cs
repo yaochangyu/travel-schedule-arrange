@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -16,6 +17,12 @@ public class TdxTourismService : ITdxTourismService
 {
     private const string HttpClientName = "Tdx";
     private const double EarthRadiusMeters = 6371000.0;
+
+    /// <summary>429 (Too Many Requests) 時的最大重試次數（不含首次呼叫）。</summary>
+    private const int MaxRetryAttempts = 3;
+
+    /// <summary>重試延遲的基準時間，採指數退避（第 1 次重試等待 1 倍、第 2 次 2 倍、第 3 次 4 倍）。</summary>
+    private static readonly TimeSpan RetryBaseDelay = TimeSpan.FromMilliseconds(500);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -73,12 +80,7 @@ public class TdxTourismService : ITdxTourismService
                   $"?$filter={Uri.EscapeDataString(filter)}" +
                   "&$top=200";
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        request.Headers.Accept.ParseAdd("application/json;odata.metadata=none");
-
-        var httpClient = _httpClientFactory.CreateClient(HttpClientName);
-        using var response = await httpClient.SendAsync(request, cancellationToken);
+        using var response = await SendWithRetryAsync(url, token, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -88,6 +90,36 @@ public class TdxTourismService : ITdxTourismService
 
         var payload = await response.Content.ReadFromJsonAsync<TdxODataResponse<T>>(JsonOptions, cancellationToken);
         return payload?.Value ?? new List<T>();
+    }
+
+    /// <summary>
+    /// 呼叫 TDX API，遇到 429（Too Many Requests，超過速率限制）時以指數退避重試，最多重試
+    /// <see cref="MaxRetryAttempts"/> 次；其他非成功狀態碼（例如 401/404）不重試，直接回傳讓上層依既有邏輯拋出例外。
+    /// 多日行程功能會對每個錨點（起點/每晚住宿/訖點）各自查詢景點與美食，短時間內請求數量較單日流程高，
+    /// 較容易觸發 TDX 的速率限制，因此加入重試機制。
+    /// </summary>
+    private async Task<HttpResponseMessage> SendWithRetryAsync(
+        string url, string token, CancellationToken cancellationToken)
+    {
+        var httpClient = _httpClientFactory.CreateClient(HttpClientName);
+
+        for (var attempt = 0; ; attempt++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Headers.Accept.ParseAdd("application/json;odata.metadata=none");
+
+            var response = await httpClient.SendAsync(request, cancellationToken);
+
+            if (response.StatusCode != HttpStatusCode.TooManyRequests || attempt >= MaxRetryAttempts)
+            {
+                return response;
+            }
+
+            response.Dispose();
+            var delay = RetryBaseDelay * Math.Pow(2, attempt);
+            await Task.Delay(delay, cancellationToken);
+        }
     }
 
     /// <summary>

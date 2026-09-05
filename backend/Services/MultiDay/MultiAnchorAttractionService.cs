@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using TravelScheduleArrange.Api.Models;
 using TravelScheduleArrange.Api.Services.Tdx;
 
@@ -7,10 +8,13 @@ namespace TravelScheduleArrange.Api.Services.MultiDay;
 public class MultiAnchorAttractionService : IMultiAnchorAttractionService
 {
     private readonly ITdxTourismService _tourismService;
+    private readonly ILogger<MultiAnchorAttractionService> _logger;
 
-    public MultiAnchorAttractionService(ITdxTourismService tourismService)
+    public MultiAnchorAttractionService(
+        ITdxTourismService tourismService, ILogger<MultiAnchorAttractionService> logger)
     {
         _tourismService = tourismService;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<Attraction>> GetNearbyAttractionsAsync(
@@ -22,16 +26,31 @@ public class MultiAnchorAttractionService : IMultiAnchorAttractionService
         return DeduplicateByKey(perAnchorResults.SelectMany(r => r));
     }
 
+    /// <summary>
+    /// 查詢單一錨點附近的景點/美食。個別錨點查詢失敗時（例如 TDX 速率限制重試後仍失敗）僅記錄警告並回傳
+    /// 空清單，不讓單一錨點的問題導致整個多錨點候選池查詢失敗——其餘錨點的結果仍應正常回傳給使用者。
+    /// </summary>
     private async Task<IReadOnlyList<Attraction>> QueryAnchorAsync(
         Coordinate anchor, int radiusMeters, CancellationToken cancellationToken)
     {
-        var scenicSpotsTask = _tourismService.GetNearbyScenicSpotsAsync(
-            anchor.Latitude, anchor.Longitude, radiusMeters, cancellationToken);
-        var restaurantsTask = _tourismService.GetNearbyRestaurantsAsync(
-            anchor.Latitude, anchor.Longitude, radiusMeters, cancellationToken);
+        try
+        {
+            var scenicSpotsTask = _tourismService.GetNearbyScenicSpotsAsync(
+                anchor.Latitude, anchor.Longitude, radiusMeters, cancellationToken);
+            var restaurantsTask = _tourismService.GetNearbyRestaurantsAsync(
+                anchor.Latitude, anchor.Longitude, radiusMeters, cancellationToken);
 
-        await Task.WhenAll(scenicSpotsTask, restaurantsTask);
-        return scenicSpotsTask.Result.Concat(restaurantsTask.Result).ToList();
+            await Task.WhenAll(scenicSpotsTask, restaurantsTask);
+            return scenicSpotsTask.Result.Concat(restaurantsTask.Result).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "查詢錨點 ({Latitude}, {Longitude}) 附近景點/美食失敗，該錨點暫不提供候選景點，其餘錨點結果不受影響。",
+                anchor.Latitude, anchor.Longitude);
+            return Array.Empty<Attraction>();
+        }
     }
 
     /// <summary>
