@@ -11,13 +11,20 @@ const CATEGORY_LABELS = {
   Restaurant: '美食',
 }
 
+// 單次排序請求允許的候選數量上限，需與後端 ItineraryController.MaxCandidateCount 保持一致。
+// 排序演算法對每個候選點都會呼叫外部交通資訊 API，呼叫次數隨候選數量呈平方成長，
+// 曾發生使用者一次選取上百筆候選、導致長時間無法完成的情況。
+const MAX_CANDIDATE_COUNT = 20
+
 // 後端景點/美食未落地資料庫，Id 皆為 0，改用 sourceId（找不到時退回索引）作為前端唯一鍵。
 function keyOf(attraction, index) {
   return attraction.sourceId ?? `idx-${index}`
 }
 
 const attractions = computed(() => planStore.attractions)
-const selectedKeys = ref(new Set(attractions.value.map((a, i) => keyOf(a, i))))
+// 預設不勾選任何候選，避免使用者在景點眾多時不慎一次送出過量候選做排序。
+const selectedKeys = ref(new Set())
+const isOverLimit = computed(() => selectedKeys.value.size > MAX_CANDIDATE_COUNT)
 
 const loading = ref(false)
 const error = ref('')
@@ -41,7 +48,7 @@ function handleBack() {
 
 async function handleGeneratePlan() {
   const selected = attractions.value.filter((a, i) => selectedKeys.value.has(keyOf(a, i)))
-  if (selected.length === 0 || !planStore.targetCoordinate) {
+  if (selected.length === 0 || selected.length > MAX_CANDIDATE_COUNT || !planStore.targetCoordinate) {
     return
   }
 
@@ -89,13 +96,19 @@ async function handleGeneratePlan() {
       </li>
     </ul>
 
+    <p class="count-hint" :class="{ 'count-hint--over': isOverLimit }">
+      已勾選 {{ selectedKeys.size }} / {{ MAX_CANDIDATE_COUNT }} 筆
+    </p>
+    <p v-if="isOverLimit" class="error">
+      已超過單次排序上限（{{ MAX_CANDIDATE_COUNT }} 筆），請取消勾選部分景點後再試。
+    </p>
     <p v-if="error" class="error">{{ error }}</p>
 
     <div class="actions">
       <button class="secondary" type="button" @click="handleBack" :disabled="loading">上一步</button>
       <button
         type="button"
-        :disabled="selectedKeys.size === 0 || loading"
+        :disabled="selectedKeys.size === 0 || isOverLimit || loading"
         @click="handleGeneratePlan"
       >
         {{ loading ? '排序中...' : '產生行程排序' }}
@@ -162,6 +175,16 @@ async function handleGeneratePlan() {
 }
 .empty {
   color: #999;
+}
+.count-hint {
+  margin-top: 1rem;
+  margin-bottom: 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+.count-hint--over {
+  color: #d33;
+  font-weight: 600;
 }
 .error {
   color: #d33;

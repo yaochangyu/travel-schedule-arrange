@@ -106,7 +106,7 @@ namespace backend.Bdd.Tests.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/PlanMultiDay.feature.ndjson", 7);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/PlanMultiDay.feature.ndjson", 8);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -341,6 +341,46 @@ namespace backend.Bdd.Tests.Features
 #line hidden
 #line 44
     await testRunner.AndAsync("候補清單應包含景點 \"A\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="候選景點數量超過上限應回傳400")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "多日行程排程 API")]
+        [global::Xunit.TraitAttribute("Description", "候選景點數量超過上限應回傳400")]
+        public async global::System.Threading.Tasks.Task 候選景點數量超過上限應回傳400()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "5";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("候選景點數量超過上限應回傳400", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 46
+  this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 47
+    await testRunner.GivenAsync("起點緯度為 0、訖點緯度為 0", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 48
+    await testRunner.AndAsync("每日可用時數依序為 \"480\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 49
+    await testRunner.AndAsync("候選景點數量為 21 筆", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 50
+    await testRunner.WhenAsync("使用者送出多日行程排程請求", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 51
+    await testRunner.ThenAsync("回應狀態碼應為 400", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

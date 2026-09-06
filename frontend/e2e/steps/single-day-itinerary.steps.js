@@ -19,14 +19,12 @@ Then(/^附近景點\/美食推薦清單筆數應大於 0$/, async ({ page }) => 
 })
 
 When(/^使用者勾選前 (\d+) 筆推薦景點並產生行程排序$/, async ({ page }, n) => {
-  const keepChecked = Number(n)
+  const count = Number(n)
   const checkboxes = page.locator('.card-list .card input[type="checkbox"]')
-  const total = await checkboxes.count()
 
-  // 推薦清單預設全部勾選，這裡僅保留前 keepChecked 筆、取消其餘勾選，
-  // 避免真的把上百筆候選一次送去後端排序（Google Distance Matrix 逐一呼叫會非常慢、耗用額度）。
-  for (let i = keepChecked; i < total; i++) {
-    await checkboxes.nth(i).uncheck()
+  // 推薦清單預設不勾選任何候選（避免一次送出過量候選做真實排序），這裡勾選前 count 筆。
+  for (let i = 0; i < count; i++) {
+    await checkboxes.nth(i).check()
   }
 
   await page.getByRole('button', { name: '產生行程排序' }).click()

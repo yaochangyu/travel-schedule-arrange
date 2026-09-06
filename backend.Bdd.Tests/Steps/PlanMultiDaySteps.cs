@@ -47,6 +47,15 @@ public class PlanMultiDaySteps : IDisposable
         _candidates.Add((name, latitude, stayMinutes));
     }
 
+    [Given(@"候選景點數量為 (\d+) 筆")]
+    public void GivenCandidateCount(int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            _candidates.Add(($"候選{i}", i, 10));
+        }
+    }
+
     [When(@"使用者送出多日行程排程請求")]
     public async Task WhenUserSubmitsPlanRequest()
     {

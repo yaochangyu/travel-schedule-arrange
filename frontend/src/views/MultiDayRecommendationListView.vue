@@ -10,8 +10,12 @@ const CATEGORY_LABELS = {
   Restaurant: '美食',
 }
 
+// 單次排序請求允許的候選數量上限，需與後端 ItineraryController.MaxCandidateCount 保持一致。
+const MAX_CANDIDATE_COUNT = 20
+
 const candidates = computed(() => multiDayStore.candidates)
 const selectedKeys = ref(new Set(multiDayStore.selectedCandidateKeys))
+const isOverLimit = computed(() => selectedKeys.value.size > MAX_CANDIDATE_COUNT)
 
 function categoryLabel(category) {
   return CATEGORY_LABELS[category] || category
@@ -31,7 +35,7 @@ function handleBack() {
 }
 
 function handleNext() {
-  if (selectedKeys.value.size === 0) {
+  if (selectedKeys.value.size === 0 || isOverLimit.value) {
     return
   }
   setSelectedCandidateKeys([...selectedKeys.value])
@@ -69,9 +73,16 @@ function handleNext() {
       </li>
     </ul>
 
+    <p class="count-hint" :class="{ 'count-hint--over': isOverLimit }">
+      已勾選 {{ selectedKeys.size }} / {{ MAX_CANDIDATE_COUNT }} 筆
+    </p>
+    <p v-if="isOverLimit" class="error">
+      已超過單次排序上限（{{ MAX_CANDIDATE_COUNT }} 筆），請取消勾選部分景點後再試。
+    </p>
+
     <div class="actions">
       <button class="secondary" type="button" @click="handleBack">上一步</button>
-      <button type="button" :disabled="selectedKeys.size === 0" @click="handleNext">
+      <button type="button" :disabled="selectedKeys.size === 0 || isOverLimit" @click="handleNext">
         下一步：設定停留時間
       </button>
     </div>
@@ -133,6 +144,19 @@ function handleNext() {
 }
 .empty {
   color: #999;
+}
+.count-hint {
+  margin-top: 1rem;
+  margin-bottom: 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+.count-hint--over {
+  color: #d33;
+  font-weight: 600;
+}
+.error {
+  color: #d33;
 }
 .actions {
   margin-top: 1.5rem;

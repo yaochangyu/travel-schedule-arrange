@@ -82,6 +82,13 @@ public record ItineraryPlanResponseItem(
 [Route("api/[controller]")]
 public class ItineraryController : ControllerBase
 {
+    /// <summary>
+    /// 單次排程請求允許的候選景點數量上限。排序演算法對每個候選點都會呼叫外部交通資訊 API
+    /// （Google Distance Matrix），呼叫次數隨候選數量呈平方成長，數量過大會在短時間內產生巨量
+    /// API 呼叫（實測部署後，前端誤將上百筆候選一次送出，導致請求長時間無法完成）。
+    /// </summary>
+    private const int MaxCandidateCount = 20;
+
     private readonly IItineraryPlannerService _plannerService;
     private readonly IMultiDayItineraryPlannerService _multiDayPlannerService;
 
@@ -101,6 +108,11 @@ public class ItineraryController : ControllerBase
         if (request.Attractions is null || request.Attractions.Count == 0)
         {
             return BadRequest("attractions 不可為空清單。");
+        }
+
+        if (request.Attractions.Count > MaxCandidateCount)
+        {
+            return BadRequest($"attractions 數量不可超過 {MaxCandidateCount} 筆（實際={request.Attractions.Count}）。");
         }
 
         var start = new Coordinate(request.StartLatitude, request.StartLongitude);
@@ -158,6 +170,12 @@ public class ItineraryController : ControllerBase
             return BadRequest(
                 $"overnightStays 數量須為天數減 1（天數={request.DailyAvailableMinutes.Count}，" +
                 $"預期住宿數={expectedOvernightStayCount}，實際={overnightStays.Count}）。");
+        }
+
+        var candidateCount = request.Candidates?.Count ?? 0;
+        if (candidateCount > MaxCandidateCount)
+        {
+            return BadRequest($"candidates 數量不可超過 {MaxCandidateCount} 筆（實際={candidateCount}）。");
         }
 
         var candidates = request.Candidates ?? new List<MultiDayCandidateItem>();
