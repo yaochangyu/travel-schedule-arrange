@@ -72,3 +72,8 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+/// <summary>供 <c>WebApplicationFactory&lt;Program&gt;</c>（backend.Bdd.Tests）在測試中啟動 in-memory server 使用。</summary>
+public partial class Program
+{
+}
