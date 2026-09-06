@@ -18,12 +18,16 @@ builder.Services.AddControllers()
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// 步驟 7：允許本機前端開發伺服器（Vite，預設 5173）跨來源呼叫本 API。
-const string FrontendDevCorsPolicy = "FrontendDev";
+// 允許前端跨來源呼叫本 API。網域清單改由設定讀取（appsettings.json 的 "AllowedOrigins" 陣列，
+// 或正式環境的 Application Settings），未設定時預設為本機開發網域，方便部署到不同環境時
+// 只需調整設定、不需改程式碼。
+const string FrontendCorsPolicy = "Frontend";
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:5173", "http://127.0.0.1:5173" };
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(FrontendDevCorsPolicy, policy =>
-        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+    options.AddPolicy(FrontendCorsPolicy, policy =>
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
@@ -65,7 +69,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseCors(FrontendDevCorsPolicy);
+app.UseCors(FrontendCorsPolicy);
 
 app.UseAuthorization();
 
