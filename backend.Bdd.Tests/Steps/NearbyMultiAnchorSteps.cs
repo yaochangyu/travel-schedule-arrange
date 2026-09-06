@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Reqnroll;
 using TravelScheduleArrange.Api.Bdd.Tests;
+using TravelScheduleArrange.Api.Bdd.Tests.Support;
 using TravelScheduleArrange.Api.Models;
 using Xunit;
 
@@ -10,8 +11,12 @@ namespace TravelScheduleArrange.Api.Bdd.Tests.Steps;
 public class NearbyMultiAnchorSteps : IDisposable
 {
     private readonly CustomWebApplicationFactory _factory = new();
-    private HttpResponseMessage? _response;
-    private string _responseBody = string.Empty;
+    private readonly ApiTestContext _context;
+
+    public NearbyMultiAnchorSteps(ApiTestContext context)
+    {
+        _context = context;
+    }
 
     [Given(@"TDX 對緯度 (.*) 的錨點回傳景點 ""(.*)""")]
     public void GivenTdxReturnsAttraction(double latitude, string attractionName)
@@ -56,32 +61,25 @@ public class NearbyMultiAnchorSteps : IDisposable
             query += $"&radius={radius.Value}";
         }
 
-        _response = await client.GetAsync($"/api/attractions/nearby-multianchor?{query}");
-        _responseBody = await _response.Content.ReadAsStringAsync();
-    }
-
-    [Then(@"回應狀態碼應為 (\d+)")]
-    public void ThenResponseStatusCodeShouldBe(int statusCode)
-    {
-        Assert.Equal(statusCode, (int)_response!.StatusCode);
+        _context.Response = await client.GetAsync($"/api/attractions/nearby-multianchor?{query}");
+        _context.ResponseBody = await _context.Response.Content.ReadAsStringAsync();
     }
 
     [Then(@"回應應包含景點 ""(.*)""")]
     public void ThenResponseShouldContainAttraction(string name)
     {
-        Assert.Contains(name, _responseBody);
+        Assert.Contains(name, _context.ResponseBody);
     }
 
     [Then(@"回應景點數量應為 (\d+)")]
     public void ThenResponseAttractionCountShouldBe(int count)
     {
-        var items = JsonSerializer.Deserialize<List<JsonElement>>(_responseBody);
+        var items = JsonSerializer.Deserialize<List<JsonElement>>(_context.ResponseBody);
         Assert.Equal(count, items!.Count);
     }
 
     public void Dispose()
     {
-        _response?.Dispose();
         _factory.Dispose();
     }
 }
